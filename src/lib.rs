@@ -35,11 +35,10 @@ impl ThreadPool {
         F: FnOnce() -> T + Send + 'static,
     {
         let s = self.clone();
-        let jh = thread::spawn(move || {
+        thread::spawn(move || {
             let _th_manager = ThreadLifeManager::create_and_wait(s);
             f()
-        });
-        jh
+        })
     }
 }
 
@@ -86,7 +85,7 @@ impl ThreadLifeManager {
         loop {
             let cnt = *manager.0.lock().unwrap();
             if cnt >= thp.count {
-                sleep(Duration::from(thp.check_duration));
+                sleep(thp.check_duration);
             } else {
                 *manager.0.lock().unwrap() += 1;
                 break;

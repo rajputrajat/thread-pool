@@ -1,6 +1,6 @@
 use std::{
     sync::{Arc, Mutex},
-    thread::{self, sleep, JoinHandle},
+    thread::{self, available_parallelism, sleep, JoinHandle},
     time::Duration,
 };
 
@@ -11,6 +11,8 @@ pub struct ThreadPool {
     threads_in_use: ThreadCounter,
 }
 
+pub struct PercentOfCpu(pub u8);
+
 impl ThreadPool {
     pub fn new(count: usize, check_duration: Duration) -> Self {
         Self {
@@ -18,6 +20,13 @@ impl ThreadPool {
             check_duration,
             threads_in_use: Arc::new(Mutex::new(0)),
         }
+    }
+
+    pub fn using_only(PercentOfCpu(perc): PercentOfCpu, check_duration: Duration) -> Self {
+        ThreadPool::new(
+            available_parallelism().unwrap().get() * perc as usize / 100,
+            check_duration,
+        )
     }
 
     pub fn spawn<T, F>(&self, f: F) -> JoinHandle<T>

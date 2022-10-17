@@ -25,10 +25,46 @@ impl ThreadPool {
         T: Send + 'static,
         F: FnOnce() -> T + Send + 'static,
     {
-        let th_manager = ThreadLifeManager::create_and_wait(self.clone());
-        let jh = thread::spawn(f);
-        drop(th_manager);
+        let s = self.clone();
+        let jh = thread::spawn(move || {
+            let _th_manager = ThreadLifeManager::create_and_wait(s);
+            f()
+        });
         jh
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        thread::{sleep, JoinHandle},
+        time::{Duration, Instant},
+    };
+
+    use super::ThreadPool;
+
+    const WAIT: usize = 100;
+
+    #[test]
+    fn multiple() {
+        let th_pool = ThreadPool::new(30, Duration::from_millis(5));
+        let thv: Vec<JoinHandle<_>> = (0..100)
+            .map(|_| {
+                let now = Instant::now();
+                th_pool.spawn(move || {
+                    sleep(Duration::from_millis(WAIT as u64));
+                    Instant::now() - now
+                })
+            })
+            .collect();
+        assert_eq!(
+            thv.into_iter().fold([0; 4], |mut arr, th| {
+                let spent = th.join().unwrap();
+                arr[(spent.as_millis() as usize / WAIT) as usize - 1] += 1;
+                arr
+            }),
+            [30, 30, 30, 10]
+        );
     }
 }
 
